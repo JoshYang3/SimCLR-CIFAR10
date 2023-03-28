@@ -11,7 +11,7 @@ from torch.optim.lr_scheduler import LambdaLR
 from torch.utils.data import DataLoader, SubsetRandomSampler
 from torchvision.datasets import CIFAR10
 from torchvision import transforms
-from torchvision.models import resnet18, resnet34
+from torchvision.models import resnet18, resnet34, resnet50, vgg11, vgg19, googlenet, alexnet
 from models import SimCLR
 from tqdm import tqdm
 
@@ -88,9 +88,16 @@ def run_epoch(model, dataloader, epoch, optimizer=None, scheduler=None):
 def get_lr(step, total_steps, lr_max, lr_min):
     """Compute learning rate according to cosine annealing schedule."""
     return lr_min + (lr_max - lr_min) * 0.5 * (1 + np.cos(step / total_steps * np.pi))
+'''
+def get_lr(step, total_steps, lr_max, lr_min):
+    """Compute learning rate according to cosine annealing schedule."""
+    if total_steps == 0:
+        total_steps = 1
+    return lr_min + (lr_max - lr_min) * 0.5 * (1 + np.cos(step / total_steps * np.pi))
+'''
 
 
-@hydra.main(config_path='simclr_config.yml')
+@hydra.main(config_name='simclr_config.yml')
 def finetune(args: DictConfig) -> None:
     train_transform = transforms.Compose([transforms.RandomResizedCrop(32),
                                           transforms.RandomHorizontalFlip(p=0.5),
@@ -102,7 +109,7 @@ def finetune(args: DictConfig) -> None:
     test_set = CIFAR10(root=data_dir, train=False, transform=test_transform, download=False)
 
     n_classes = 10
-    indices = np.random.choice(len(train_set), 10*n_classes, replace=False)
+    indices = np.random.choice(len(train_set), 60*n_classes, replace=False)
     sampler = SubsetRandomSampler(indices)
     train_loader = DataLoader(train_set, batch_size=args.batch_size, drop_last=True, sampler=sampler)
     test_loader = DataLoader(test_set, batch_size=args.batch_size, shuffle=False)
@@ -111,6 +118,8 @@ def finetune(args: DictConfig) -> None:
     base_encoder = eval(args.backbone)
     pre_model = SimCLR(base_encoder, projection_dim=args.projection_dim).cuda()
     pre_model.load_state_dict(torch.load('simclr_{}_epoch{}.pt'.format(args.backbone, args.load_epoch)))
+    #print(pre_model.state_dict().keys())
+
     model = LinModel(pre_model.enc, feature_dim=pre_model.feature_dim, n_classes=len(train_set.targets))
     model = model.cuda()
 
@@ -127,6 +136,9 @@ def finetune(args: DictConfig) -> None:
         nesterov=True)
 
     # cosine annealing lr
+    #print("args.epochs:", args.epochs)
+    #print("len(train_loader):", len(train_loader))
+
     scheduler = LambdaLR(
         optimizer,
         lr_lambda=lambda step: get_lr(  # pylint: disable=g-long-lambda

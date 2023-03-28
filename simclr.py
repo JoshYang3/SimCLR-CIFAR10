@@ -11,7 +11,7 @@ import torch.nn.functional as F
 from torch.optim.lr_scheduler import LambdaLR
 from torch.utils.data import DataLoader
 from torchvision.datasets import CIFAR10
-from torchvision.models import resnet18, resnet34
+from torchvision.models import resnet18, resnet34, resnet50, vgg11, vgg19, googlenet, alexnet
 from torchvision import transforms
 
 from models import SimCLR
@@ -81,7 +81,7 @@ def get_color_distortion(s=0.5):  # 0.5 for CIFAR10 by default
     return color_distort
 
 
-@hydra.main(config_path='simclr_config.yml')
+@hydra.main(config_name='simclr_config.yml')
 def train(args: DictConfig) -> None:
     assert torch.cuda.is_available()
     cudnn.benchmark = True
@@ -103,7 +103,7 @@ def train(args: DictConfig) -> None:
                               drop_last=True)
 
     # Prepare model
-    assert args.backbone in ['resnet18', 'resnet34']
+    assert args.backbone in ['resnet18', 'resnet34', 'resnet50', 'vgg11','vgg19', 'googlenet', 'alexnet']
     base_encoder = eval(args.backbone)
     model = SimCLR(base_encoder, projection_dim=args.projection_dim).cuda()
     logger.info('Base model: {}'.format(args.backbone))
